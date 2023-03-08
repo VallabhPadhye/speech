@@ -8,5 +8,5 @@ tensorflow
 
 sounddevice
 
-portaudio
+PortAudio
 
