@@ -1,90 +1,50 @@
 import streamlit as st
-
 import librosa
-
 import numpy as np
+from tensorflow.keras.models import load_model
 
-import tensorflow as tf
+# Load Keras model
+@st.cache(allow_output_mutation=True)
+def load_emotion_model():
+    model = load_model('emotion_model.h5')
+    return model
 
-import sounddevice as sd
+emotion_model = load_emotion_model()
 
-# Load the trained model
+# Define function to extract features from audio file
+def extract_feature(file_path):
+    try:
+        audio_data, sample_rate = librosa.load(file_path, res_type='kaiser_fast')
+        mfccs = librosa.feature.mfcc(y=audio_data, sr=sample_rate, n_mfcc=40)
+        mfccs_processed = np.mean(mfccs.T,axis=0)
+        
+    except Exception as e:
+        print("Error encountered while parsing file: ", file_path)
+        return None 
+     
+    return mfccs_processed
 
-model = tf.keras.models.load_model('path/to/your/trained/model')
+# Define emotions
+emotions = {
+    '0': 'Angry',
+    '1': 'Calm',
+    '2': 'Fearful',
+    '3': 'Happy',
+    '4': 'Neutral',
+    '5': 'Sad'
+}
 
-# Define the labels for different emotions
+# Define app layout
+st.set_page_config(page_title="Voice Emotion Recognition App")
+st.title("Voice Emotion Recognition App")
 
-labels = ['neutral', 'calm', 'happy', 'sad', 'angry', 'fearful', 'disgust', 'surprised']
+# Add file uploader to sidebar
+uploaded_file = st.sidebar.file_uploader("Upload an audio file", type=['wav'])
 
-# Define a function to extract features from the audio data
-
-def extract_feature(file_name, mfcc, chroma, mel):
-
-    X, sample_rate = librosa.load(file_name, res_type='kaiser_fast')
-
-    features = np.array([])
-
-    if chroma:
-
-        chroma = np.mean(librosa.feature.chroma_stft(y=X, sr=sample_rate).T, axis=0)
-
-        features = np.hstack((features, chroma))
-
-    if mfcc:
-
-        mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T, axis=0)
-
-        features = np.hstack((features, mfccs))
-
-    if mel:
-
-        mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T, axis=0)
-
-        features = np.hstack((features, mel))
-
-    return features
-
-# Define the Streamlit app
-
-def app():
-
-    st.title("Speech Emotion Recognition")
-
-    # Record audio from the user's microphone
-
-    st.write("Press the button to start recording")
-
-    duration = st.slider("Recording duration (in seconds)", 1, 10, 3, 1)
-
-    with st.spinner('Recording...'):
-
-        recording = sd.rec(int(duration * 22050), samplerate=22050, channels=1)
-
-        sd.wait()
-
-        st.write("Recording complete")
-
-    # Extract features from the recorded audio
-
-    features = extract_feature(recording, mfcc=True, chroma=True, mel=True)
-
-    # Normalize the features
-
-    features = (features - np.mean(features)) / np.std(features)
-
-    # Make the prediction
-
-    prediction = model.predict(np.expand_dims(features, axis=0))
-
-    prediction_label = labels[np.argmax(prediction)]
-
-    # Display the result
-
-    st.write(f"Predicted emotion: {prediction_label}")
-
-# Run the app
-
-if __name__ == '__main__':
-
-    app()
-
+# If file is uploaded, extract features and predict emotion
+if uploaded_file is not None:
+    st.sidebar.audio(uploaded_file, format='audio/wav')
+    feature = extract_feature(uploaded_file)
+    feature = np.expand_dims(feature, axis=0)
+    prediction = emotion_model.predict(feature).argmax(axis=1)[0]
+    st.write("The predicted emotion is:", emotions[str(prediction)])
