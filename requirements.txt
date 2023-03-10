@@ -1,12 +1,6 @@
-streamlit
-
-librosa
-
 numpy
-
+pandas
+streamlit
+librosa
 tensorflow
-
-sounddevice
-
-PortAudio
-
+keras
